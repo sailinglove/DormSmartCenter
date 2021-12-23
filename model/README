@@ -1,9 +1,3 @@
-US English model for mobile Vosk applications
+This model was compiled from various available sources. 
 
-Copyright 2020 Alpha Cephei Inc
-
-Accuracy: 10.38 (tedlium test) 9.85 (librispeech test-clean)
-Speed: 0.11xRT (desktop)
-Latency: 0.15s (right context)
-
-
+Thanks to Xingyu Na for multi-cn recipe in Kaldi.
