@@ -1,11 +1,15 @@
 from card import readCard, loadTrusted
 from door import doorOpen, doorClose
+from light import lightOn, lightOff
+from listen import listen
+import commands as c
 import threading, time
 
 # --- presets ---
 
-trustedIDPath = "final/IDs"
-threadLock = threading.Lock()
+trustedIDPath = "IDs"
+cardMatchLock = threading.Lock()
+c._init()
 
 # ---------------
 
@@ -13,6 +17,7 @@ threadLock = threading.Lock()
 
 cardDetactExit = False
 cardMatchFlag = False
+
 
 # ------------------------
 
@@ -27,9 +32,9 @@ def cardDetect():
     while not cardDetactExit:
         cardID = readCard()
         if cardID in trustedIDs:
-            threadLock.acquire()
+            cardMatchLock.acquire()
             cardMatchFlag = True
-            threadLock.release()
+            cardMatchLock.release()
             time.sleep(3)
         time.sleep(0.1)
 
@@ -46,9 +51,9 @@ def doorListen():
     while 1:
         if cardMatchFlag:
             doorOpen()
-            threadLock.acquire()
+            cardMatchLock.acquire()
             cardMatchFlag = False
-            threadLock.release()
+            cardMatchLock.release()
             time.sleep(3)
             doorClose()
         time.sleep(0.1)
@@ -59,10 +64,40 @@ doorListenThread.setDaemon(True)
 # ------------
 
 
+# --- listen ---
+
+listenThread = threading.Thread(target=listen)
+listenThread.setDaemon(True)
+
+# --------------
+
+
+# --- voice control ---
+
+def voiceControl():
+    while True:
+        commands = c.get_commands()
+        # print(commands)
+        if "开灯" in commands:
+            lightOn()
+            c.set_commands('')
+        elif "关灯" in commands:
+            lightOff()
+            c.set_commands('')
+        time.sleep(0.1)
+
+voiceControlThread = threading.Thread(target=voiceControl)
+voiceControlThread.setDaemon(True)
+
+# ---------------
+
+
 # --- main ---
 
 cardDetectThread.start()
 doorListenThread.start()
+listenThread.start()
+voiceControlThread.start()
 
 while 1:
     time.sleep(0.1)

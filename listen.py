@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import commands as c
+
 import argparse
 import os
 import queue
@@ -8,6 +10,9 @@ import vosk
 import sys
 
 q = queue.Queue()
+
+def textConvert(s: str):
+    return s.strip('{\n  "text" : "').strip('"\n}').strip(" ")
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -47,43 +52,43 @@ parser.add_argument(
     '-r', '--samplerate', type=int, help='sampling rate')
 args = parser.parse_args(remaining)
 
-try:
-    if args.model is None:
-        args.model = "model"
-    if not os.path.exists(args.model):
-        print ("Please download a model for your language from https://alphacephei.com/vosk/models")
-        print ("and unpack as 'model' in the current folder.")
+
+def listen():
+    try:
+        if args.model is None:
+            args.model = "model"
+        if not os.path.exists(args.model):
+            print ("Please download a model for your language from https://alphacephei.com/vosk/models")
+            print ("and unpack as 'model' in the current folder.")
+            parser.exit(0)
+        if args.samplerate is None:
+            device_info = sd.query_devices(args.device, 'input')
+            # soundfile expects an int, sounddevice provides a float:
+            args.samplerate = int(device_info['default_samplerate'])
+
+        model = vosk.Model(args.model)
+
+        if args.filename:
+            dump_fn = open(args.filename, "wb")
+        else:
+            dump_fn = None
+
+        with sd.RawInputStream(samplerate=args.samplerate, blocksize = 8000, device=args.device, dtype='int16',
+                                channels=1, callback=callback):
+
+                rec = vosk.KaldiRecognizer(model, args.samplerate)
+                while True:
+                    data = q.get()
+                    if rec.AcceptWaveform(data):
+                        c.append_command(textConvert(rec.Result()))
+                        print(c.get_commands())
+                    # else:
+                    #     print(rec.PartialResult())
+                    if dump_fn is not None:
+                        dump_fn.write(data)
+
+    except KeyboardInterrupt:
+        print('\nDone')
         parser.exit(0)
-    if args.samplerate is None:
-        device_info = sd.query_devices(args.device, 'input')
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info['default_samplerate'])
-
-    model = vosk.Model(args.model)
-
-    if args.filename:
-        dump_fn = open(args.filename, "wb")
-    else:
-        dump_fn = None
-
-    with sd.RawInputStream(samplerate=args.samplerate, blocksize = 8000, device=args.device, dtype='int16',
-                            channels=1, callback=callback):
-            print('#' * 80)
-            print('Press Ctrl+C to stop the recording')
-            print('#' * 80)
-
-            rec = vosk.KaldiRecognizer(model, args.samplerate)
-            while True:
-                data = q.get()
-                if rec.AcceptWaveform(data):
-                    print(rec.Result())
-                else:
-                    print(rec.PartialResult())
-                if dump_fn is not None:
-                    dump_fn.write(data)
-
-except KeyboardInterrupt:
-    print('\nDone')
-    parser.exit(0)
-except Exception as e:
-    parser.exit(type(e).__name__ + ': ' + str(e))
+    except Exception as e:
+        parser.exit(type(e).__name__ + ': ' + str(e))
